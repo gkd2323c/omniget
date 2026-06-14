@@ -84,6 +84,34 @@
     }
   }
 
+  function reloadPluginNav() {
+    invoke<{ id: string; enabled: boolean; nav: { route: string; label: Record<string, string>; icon_svg: string | null; group: string; order: number }[] }[]>("list_plugins")
+      .then((plugins) => {
+        const items: NavItem[] = [];
+        for (const p of plugins) {
+          if (!p.enabled) continue;
+          for (const n of p.nav) {
+            if (n.route === "/study/focus" && !STUDY_FOCUS_ENABLED) continue;
+            if (n.route === "/study/progress" && !STUDY_PROGRESS_ENABLED) continue;
+            if (n.route === "/study/achievements" && !STUDY_ACHIEVEMENTS_ENABLED) continue;
+            if (n.route === "/study/notes" && !STUDY_NOTES_ENABLED) continue;
+            items.push({
+              href: n.route,
+              label: n.label[get(locale)] || n.label["en"] || p.id,
+              icon: "plugin",
+              iconSvg: n.icon_svg || undefined,
+              group: "plugins",
+              pluginId: p.id,
+              order: n.order,
+            });
+          }
+        }
+        pluginNavItems = items;
+        buildCommandPaletteItems();
+      })
+      .catch(() => {});
+  }
+
   function buildCommandPaletteItems() {
     const navItems = [...CORE_NAV_ITEMS, ...pluginNavItems].map((item) => ({
       id: `nav-${item.href}`,
@@ -185,31 +213,8 @@
     }
     void import("$components/debug/DebugPanel.svelte").then((m) => { DebugPanel = m.default; });
 
-    invoke<{ id: string; enabled: boolean; nav: { route: string; label: Record<string, string>; icon_svg: string | null; group: string; order: number }[] }[]>("list_plugins")
-      .then((plugins) => {
-        const items: NavItem[] = [];
-        for (const p of plugins) {
-          if (!p.enabled) continue;
-          for (const n of p.nav) {
-            if (n.route === "/study/focus" && !STUDY_FOCUS_ENABLED) continue;
-            if (n.route === "/study/progress" && !STUDY_PROGRESS_ENABLED) continue;
-            if (n.route === "/study/achievements" && !STUDY_ACHIEVEMENTS_ENABLED) continue;
-            if (n.route === "/study/notes" && !STUDY_NOTES_ENABLED) continue;
-            items.push({
-              href: n.route,
-              label: n.label[get(locale)] || n.label["en"] || p.id,
-              icon: "plugin",
-              iconSvg: n.icon_svg || undefined,
-              group: "plugins",
-              pluginId: p.id,
-              order: n.order,
-            });
-          }
-        }
-        pluginNavItems = items;
-        buildCommandPaletteItems();
-      })
-      .catch(() => {});
+    reloadPluginNav();
+    listen("plugins-changed", () => { reloadPluginNav(); });
     listen<Omit<ExternalUrlEvent, "id">>("external-url", (event) => {
       handleExternalUrlEvent(event.payload);
     }).then((fn) => {
